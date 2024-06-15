@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Othello</title>
+    <script src="script.js" defer></script>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+    <h1 id="banner">Choose board size and click Create Grid</h1>
+    <p id="prompt" style="display: none;">Black goes first!</p>
+    <div class="main-container">
+        <div class="side-column">
+            <form id="sizeForm">
+                <select id="gridSize">
+                    <option value="null">Choose Size</option>
+                    <option value="6">6</option>
+                    <option value="8">8</option>
+                    <option value="10">10</option>
+                    <option value="12">12</option>
+                </select>
+                <button type="button" id="gridButton" onclick="handleButtonClick()">Create Grid</button>
+            </form>
+            <div>
+                <h3>Score</h3>
+                <p>Black: <span id="blackScore">0</span></p>
+                <p>White: <span id="whiteScore">0</span></p>
+                <p>Empty: <span id="empty">0</span></p>
+                <h3>Last Played</h3>
+                <p>Column: <span id="lastColumn">0</span></p>
+                <p>Row: <span id="lastRow">0</span></p>
+                <p>Index: <span id="index">0</span></p>
+                <p>clicked: <span id="clicked">0</span></p>  
+            </div>
+        </div>
+    <div class="image-container"></div>
+</body>
+</html>
+
+
+<!--    <p>Friend: <span id="friend">0</span></p>
+<p>Foe: <span id="foe">0</span></p>
+<p>srcContent: <span id="srcContent">0</span></p>   -->
