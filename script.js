@@ -1,10 +1,13 @@
-let turn = 'black';
 let clicked = 999;
 let gridCreated = false;
+let size = 0;
+let undoStack = [];
+let blackLegalMoves = true;
+let whiteLegalMoves = true;
 
 function createGrid() {
   turn = 'black';
-  const size = parseInt(document.getElementById('gridSize').value);
+  size = parseInt(document.getElementById('gridSize').value);
   if (size === 'null') {
       alert('Please choose a grid size');
       return;
@@ -36,16 +39,19 @@ function createGrid() {
   setBoard();
   updateScores();
   lastPlayed(0, 0);
+  scanLegalMoves();
 }
 
 function changeImage(index) {
+  //scanLegalMoves();
   const img = document.getElementById(`box-image-${index}`);
-  if (img.src.includes('placeholder_image.jpg')) {
-    const size = parseInt(document.getElementById('gridSize').value);
+  if (img.src.includes('legal.jpeg')) {
+    undoStack.push(captureLayout());          //An array of arrays!!!
+    
     const [row, col] = rowCol(index);
     //scanDirections(row, col);
 
-    console.log(`Turn before change: ${turn}`);
+    //console.log(`Turn before change: ${turn}`);
 
     //let piecesTurned = scanDirections(row, col);
 
@@ -55,7 +61,7 @@ function changeImage(index) {
       return;
     }
 */
-    if (turn === 'black') {
+    if (clicked % 2 == 0) {
         img.src = 'black.jpeg';
         img.alt = 'black piece';
         turn = 'white';
@@ -65,7 +71,7 @@ function changeImage(index) {
         turn = 'black';
     }
 
-    console.log(`Turn after change: ${turn}`);
+    //console.log(`Turn after change: ${turn}`);
 
     clicked += 1;
     lastPlayed(row, col);
@@ -74,36 +80,42 @@ function changeImage(index) {
     friendOrFoe();
     changeBanner();
     updateScores();
+    scanLegalMoves();
 
-/*
-    if (endGame()) {
-      if (blackScore > whiteScore) {
-        alert('Game over - Black WINS!!!');
-      } else if (blackScore < whiteScore) {
-        alert('Game over - White WINS!!!');
-      } else if (blackScore === whiteScore) {
-        alert('Game over - Tie game');
-      }
-      
-    }
-
-    */
   }
 }
 
 
 function changeBanner() {
   const promptElement = document.getElementById('banner');
-  if (clicked === 999) {
+  const [whiteScore, blackScore, empty, legalScore] = calcScore();
+  
+  if (endGame()){
+    if (blackScore > whiteScore) {
+      promptElement.innerHTML = 'Game over - Black WINS!!!';
+    } else if (blackScore < whiteScore) {
+      promptElement.innerHTML = 'Game over - White WINS!!!';
+    } else {
+      promptElement.innerHTML = 'Game over - Tie game';
+    }
+  } else {
+    if (clicked === 999) {
       promptElement.innerHTML = "Choose board size and click Create Grid";
-  } else if (clicked % 2 > 0) {
-      promptElement.innerHTML = "White's Turn";
-  } else if (clicked % 2 == 0) {
-      promptElement.innerHTML = "Black's Turn";
-  } else
-      promptElement.innerHTML = "something is wrong here in the changeBanner fucntion";
-  }
+    } else if (clicked % 2 > 0) {
+        promptElement.innerHTML = "White's Turn";
+    } else {
+        promptElement.innerHTML = "Black's Turn";
+    }
+  } 
+    
+  //console.log(`LOG: From changeBanner, Endgame = ${endGame()}.`);
+}
 
+
+function endGame() {
+  const [whiteScore, blackScore, empty, legalScore] = calcScore();
+  return (clicked === ((size * size) - 4)) || ((whiteScore + blackScore) === (size * size));
+}
 
 
 function updateButton() {
@@ -120,7 +132,6 @@ function handleButtonClick() {
 }
 
 function restartGame() {
-  const size = parseInt(document.getElementById('gridSize').value);
   if (size === 'null') {
       alert('Please choose a grid size');
       return;
@@ -137,7 +148,7 @@ function restartGame() {
   lastPlayed(0, 0);
 }
 
-function getDimensions(size) {
+function getDimensions() {
   const halfCube = (size * size) / 2;
   const firstWhite = halfCube - (size/2);
   const firstBlack = halfCube - (size/2) + 1;
@@ -147,7 +158,6 @@ function getDimensions(size) {
 }
 
 function setBoard() {
-  const size = parseInt(document.getElementById('gridSize').value);
   const [firstWhite, firstBlack, secondBlack, secondWhite] = getDimensions(size);
 
   document.getElementById(`box-image-${firstWhite}`).src = 'white.jpeg';
@@ -166,9 +176,9 @@ function setBoard() {
 }
 
 function calcScore () {
-  const size = parseInt(document.getElementById('gridSize').value);
   let whiteScore = 0;
   let blackScore = 0;
+  let legalScore = 0;
   let empty = 0;
   for (let i = 1; i <= size * size; i++) {
     const img = document.getElementById(`box-image-${i}`);
@@ -178,20 +188,58 @@ function calcScore () {
       blackScore += 1;
     } else if (img.src.includes('placeholder_image.jpg')) {
       empty += 1;
+    } else if (img.src.includes('legal.jpeg')) {
+      legalScore += 1;
     }
   }
-  return [whiteScore, blackScore, empty];
+  return [whiteScore, blackScore, empty, legalScore];
+}
+
+function captureLayout() {
+  let boardLayout = [];
+  for (let i = 1; i <= size * size; i++) {
+    const img = document.getElementById(`box-image-${i}`);
+    boardLayout.push(img.src);
+  }
+  return boardLayout;
+}
+
+function restoreLayout(boardLayout) {
+  for (let i = 1; i <= size * size; i++) {
+    const img = document.getElementById(`box-image-${i}`);
+    img.src = boardLayout[i-1];
+  }
+  updateScores();
+}
+
+function undoMove() {
+  if (undoStack.length > 0) {
+    const previousLayout = undoStack.pop();
+    restoreLayout(previousLayout);
+    clicked -= 1;
+    changeBanner();
+    lastPlayed(0, 0);     // This is in here because it inc/decrements clicked.
+    scanLegalMoves();
+
+    console.log('Move undone.');
+
+  } else {
+
+    console.log('No move to undo.');
+
+  }
+  return clicked;
 }
 
 function updateScores() {
-  const [whiteScore, blackScore, empty] = calcScore();
+  const [whiteScore, blackScore, empty, legalScore] = calcScore();
   document.getElementById('whiteScore').innerText = whiteScore;
   document.getElementById('blackScore').innerText = blackScore;
   document.getElementById('empty').innerText = empty;
+  document.getElementById('legalScore').innerText = legalScore;
 }
 
 function rowCol (index) {
-  const size = parseInt(document.getElementById('gridSize').value);
   const row = Math.floor((index - 1) / size) + 1;
   const col = (index - 1) % size + 1;
   return [row, col];
@@ -209,7 +257,7 @@ function lastPlayed (row, col) {
 }
 
 // Tester function to display contents of the .src for the last played,
-// given the index
+// given the row, col
 
 function srcDetails (row, col) {
   let index = getIndex(row, col);
@@ -228,13 +276,13 @@ function srcDetails (row, col) {
 
 
 function getIndex(row, col) {
-  const size = parseInt(document.getElementById('gridSize').value);
+  
   let index = ((row - 1) * size) + col;
   document.getElementById('index').innerText = index;
   return index;
 }
 
-function friendOrFoe(turn) {
+function friendOrFoe() {
   let friend, foe;
   const unplayed = 'placeholder_image.jpg';
   //const legal = 'legal.jpeg';
@@ -253,7 +301,7 @@ function friendOrFoe(turn) {
 }
 
 function scanDirections(row, col) {
-  const size = parseInt(document.getElementById('gridSize').value);
+  
   let [friend, foe, unplayed] = friendOrFoe();
   const directions = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
   //let piecesTurned = false;
@@ -293,27 +341,69 @@ function scanDirections(row, col) {
       nextCol += dCol;
     }
   });
-
-  //return piecesTurned;
 }
 
+function scanLegalMoves() {
+  let [friend, foe, unplayed] = friendOrFoe();
+  const directions = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+  clearLegalMoves();
+  let legalMoves = [];
 
+  for (let i = 1; i <= size * size; i++) {
+    let imgElement = document.getElementById(`box-image-${i}`);
 
-function endGame() {
-  const size = parseInt(document.getElementById('gridSize').value);
-  const [whiteScore, blackScore, empty] = calcScore();
-  if (clicked === ((size * size) - 4)) {
-    return true;
-  } else if ((whiteScore + blackScore) === 36) {
-    return true;
+    if(imgElement) {  //if valid
+      let src = imgElement.src.split('/').pop();  //Get the filename of the pic
+
+      if (src.includes(unplayed)) {   //Dont need to check anything other than unplayed
+        let [row, col] = rowCol(i);
+
+        directions.forEach(direction => {
+          const [dRow, dCol] = direction;
+          let nextRow = row + dRow;
+          let nextCol = col + dCol;
+          let potentialFoes = [];
+
+          while ((nextRow >= 1) && (nextRow <= size) && (nextCol >= 1) && (nextCol <= size)) {
+            let nextIndex = getIndex(nextRow, nextCol);
+            let nextImgElement = document.getElementById(`box-image-${nextIndex}`);
+
+            if (!nextImgElement) {
+              break;
+            }
+
+            let nextSrc = nextImgElement.src.split('/').pop();
+
+// Somehow my logic is working ok, but the friend/foe is swapped and the legal moves are marked wrong
+            
+            if (nextSrc.includes(friend)) {   //This should say "friend"
+              potentialFoes.push(nextIndex);
+            } else if (nextSrc.includes(foe)) {   //This should say "foe"
+              if (potentialFoes.length > 0) {
+                imgElement.src = 'legal.jpeg';
+              }
+              break;
+            } else {
+              break;
+            }
+
+            nextRow += dRow;
+            nextCol += dCol;
+          }
+        });
+      }
+    }
   }
-  return false;
 }
 
-
-
-
-
+function clearLegalMoves() {
+  for (let i = 1; i <= (size * size); i++) {
+    let imgElement = document.getElementById(`box-image-${i}`);
+    if (imgElement && imgElement.src.includes('legal.jpeg')) {
+      imgElement.src = 'placeholder_image.jpg';
+    }
+  }
+}
 
 
 /* Execution starts here */
