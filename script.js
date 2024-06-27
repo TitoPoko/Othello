@@ -1,17 +1,23 @@
 let clicked = 999;
 let gridCreated = false;
-let size = 0;
+let size = -1;
 let undoStack = [];
-let blackLegalMoves = true;
-let whiteLegalMoves = true;
+const directions = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+const player = ['black.jpeg', 'white.jpeg'];
+
+function setSize() {
+  size = parseInt(document.getElementById('gridSize').value);
+
+  if (isNaN(size)) {
+    alert('Please choose a grid size');
+    return false;
+  }
+  return true;
+}
 
 function createGrid() {
-  turn = 'black';
   size = parseInt(document.getElementById('gridSize').value);
-  if (size === 'null') {
-      alert('Please choose a grid size');
-      return;
-  }
+  if (!setSize()) return;
 
   const container = document.querySelector('.image-container');
   container.innerHTML = '';
@@ -37,54 +43,82 @@ function createGrid() {
   gridCreated = true;
   updateButton();
   setBoard();
-  updateScores();
   lastPlayed(0, 0);
   scanLegalMoves();
+  updateScores();
 }
 
+// the below ChangeImage function tries to incorporate noLegalMovesAvailale logic. It's not there yet.
+/*
 function changeImage(index) {
-  //scanLegalMoves();
+  updateScores();
+  if (!legalMovesAvailable()) {
+    alert('No legal moves available, your turn is skipped');
+    skipped += 1;
+    clicked += 1;
+    changeBanner();
+    scanLegalMoves();
+    updateScores();
+     // Increment clicked for the skipped turn
+    scanLegalMoves();
+  } else {
+    const img = document.getElementById(`box-image-${index}`);
+    if (img.src.includes('legal.jpeg')) {
+      undoStack.push(captureLayout());          //An array of arrays!!!
+      
+      const [row, col] = rowCol(index);
+      let [friend, foe, unplayed, legal] = friendOrFoe();
+      
+      if (clicked % 2 == 0) {
+          img.src = 'black.jpeg';
+          img.alt = 'black piece';
+      } else {
+          img.src = 'white.jpeg';
+          img.alt = 'white piece';
+      }
+
+
+      clicked += 1;
+      lastPlayed(row, col)
+      scanDirections(row, col, friend, foe);
+      changeBanner();
+      scanLegalMoves();
+      updateScores();
+    }
+  }
+}
+*/
+
+function changeImage(index) {
+  updateScores();
   const img = document.getElementById(`box-image-${index}`);
   if (img.src.includes('legal.jpeg')) {
-    undoStack.push(captureLayout());          //An array of arrays!!!
+    undoStack.push(captureLayout());                    //An array of arrays!!!
     
     const [row, col] = rowCol(index);
-    //scanDirections(row, col);
-
-    //console.log(`Turn before change: ${turn}`);
-
-    //let piecesTurned = scanDirections(row, col);
-
-/*
-    if (!piecesTurned) {
-      alert('Invalid move - No pieces turned!');
-      return;
-    }
-*/
-    if (clicked % 2 == 0) {
-        img.src = 'black.jpeg';
-        img.alt = 'black piece';
-        turn = 'white';
-    } else {
-        img.src = 'white.jpeg';
-        img.alt = 'white piece';
-        turn = 'black';
-    }
-
-    //console.log(`Turn after change: ${turn}`);
-
+    let [friend, foe, unplayed, legal] = friendOrFoe();
+    setImageSrc(img);                                   // refactored/added
     clicked += 1;
-    lastPlayed(row, col);
-    srcDetails(row, col);
-    scanDirections(row, col);
-    friendOrFoe();
+    lastPlayed(row, col)
+    scanDirections(row, col, friend, foe);
     changeBanner();
-    updateScores();
     scanLegalMoves();
-
+    updateScores();
   }
 }
 
+// I think this function can be tied to whomever is friend. It works now but it can probably be better?
+
+function setImageSrc(img) {
+  if (clicked % 2 == 0) {
+    img.src = 'black.jpeg';
+    img.alt = 'black piece';
+  } else {
+    img.src = 'white.jpeg';
+    img.alt = 'white piece';
+  }
+  return [img.src, img.alt];
+}
 
 function changeBanner() {
   const promptElement = document.getElementById('banner');
@@ -107,8 +141,6 @@ function changeBanner() {
         promptElement.innerHTML = "Black's Turn";
     }
   } 
-    
-  //console.log(`LOG: From changeBanner, Endgame = ${endGame()}.`);
 }
 
 
@@ -117,34 +149,29 @@ function endGame() {
   return (clicked === ((size * size) - 4)) || ((whiteScore + blackScore) === (size * size));
 }
 
-
 function updateButton() {
   const button = document.getElementById('gridButton');
   button.innerText = gridCreated ? "Restart Game" : "Create Grid";
 }
 
 function handleButtonClick() {
-  if (gridCreated) {
-      restartGame();
-  } else {
-      createGrid();
-  }
+  gridCreated ? restartGame() : createGrid();
 }
 
 function restartGame() {
-  if (size === 'null') {
+  if (!setSize()) {
       alert('Please choose a grid size');
       return;
   }
 
   gridCreated = false;
-  turn = 'black';
   clicked = 0;
+  undoStack = [];   //Clears out the array so an "undo move" click doesnt ruin the layout when pressed
   const container = document.querySelector('.image-container');
   container.innerHTML = '';
+  createGrid();
   changeBanner();
   updateButton();
-  createGrid();
   lastPlayed(0, 0);
 }
 
@@ -158,7 +185,7 @@ function getDimensions() {
 }
 
 function setBoard() {
-  const [firstWhite, firstBlack, secondBlack, secondWhite] = getDimensions(size);
+  const [firstWhite, firstBlack, secondBlack, secondWhite] = getDimensions();
 
   document.getElementById(`box-image-${firstWhite}`).src = 'white.jpeg';
   document.getElementById(`box-image-${firstWhite}`).alt = 'white piece';
@@ -218,16 +245,11 @@ function undoMove() {
     restoreLayout(previousLayout);
     clicked -= 1;
     changeBanner();
-    lastPlayed(0, 0);     // This is in here because it inc/decrements clicked.
     scanLegalMoves();
-
-    console.log('Move undone.');
-
   } else {
-
-    console.log('No move to undo.');
-
+    alert('Cannot undo move (no previous moves).')
   }
+
   return clicked;
 }
 
@@ -258,22 +280,19 @@ function lastPlayed (row, col) {
 
 // Tester function to display contents of the .src for the last played,
 // given the row, col
-
+/*
 function srcDetails (row, col) {
   let index = getIndex(row, col);
   let imgElement = document.getElementById(`box-image-${index}`)
 
   if (imgElement) {
     let srcContent = imgElement.src.split('/').pop(); // Only takes the last part of the file path
-    //document.getElementById('srcContent').innerText = srcContent;
-    //console.log(srcContent);
     return srcContent;
   } else {
-    console.error(`Element with ID 'box-image-${index}' AINT found.`);
     return null;
   }
 }
-
+*/
 
 function getIndex(row, col) {
   
@@ -283,36 +302,33 @@ function getIndex(row, col) {
 }
 
 function friendOrFoe() {
-  let friend, foe;
   const unplayed = 'placeholder_image.jpg';
-  //const legal = 'legal.jpeg';
+  const legal = 'legal.jpeg';
+  let friend = player[clicked % 2];
+  let foe = player[(clicked % 2 + 1) % 2];
 
-  if (clicked % 2 == 0) {
-    friend = 'white.jpeg';
-    foe = 'black.jpeg';
-  } else if (clicked % 2 > 0) {
-    friend = 'black.jpeg';
-    foe = 'white.jpeg';
-  }
-
-  //document.getElementById('friend').innerText = friend;
-  //document.getElementById('foe').innerText = foe;
-  return [friend, foe, unplayed];
+  return [friend, foe, unplayed, legal];
 }
 
-function scanDirections(row, col) {
-  
-  let [friend, foe, unplayed] = friendOrFoe();
-  const directions = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
-  //let piecesTurned = false;
+function boundaries(nextRow, nextCol) {
+  return ((nextRow >= 1) && (nextRow <= size) && (nextCol >= 1) && (nextCol <= size));
+}
 
+function processDirections(row, col, callback) {
   directions.forEach(direction => {
     const [dRow, dCol] = direction;
     let nextRow = row + dRow;
     let nextCol = col + dCol;
+    callback(nextRow, nextCol, dRow, dCol);
+  });
+}
+
+function scanDirections(row, col, friend, foe) {
+  processDirections(row, col, (nextRow, nextCol, dRow, dCol) => {
+  
     let adjacentFoes = [];
 
-    while ((nextRow >= 1) && (nextRow <= size) && (nextCol >= 1) && (nextCol <= size)) {
+    while (boundaries(nextRow, nextCol)) {
       let nextIndex = getIndex(nextRow, nextCol);
       let imgElement = document.getElementById(`box-image-${nextIndex}`);
     
@@ -320,21 +336,17 @@ function scanDirections(row, col) {
         break;
       }
 
-      let src = imgElement.src.split('/').pop(); // removes filepath, leaves only filename and extension
+      let src = imgElement.src.split('/').pop();
 
       if (src.includes(friend)) {
-        if (adjacentFoes.length > 0) {
-          adjacentFoes.forEach(([r, c]) => {
-            let index = getIndex(r, c);
-            document.getElementById(`box-image-${index}`).src = friend;
-          });
-          //piecesTurned = true;
-        }
+        flipCellToFriend(adjacentFoes, friend);
+
         break; // Exit the while loop once friend is found and foes are flipped
       } else if (src.includes(foe)) {
-        adjacentFoes.push([nextRow, nextCol]);
-      } else if (src === unplayed) {
-        break; // Exit if an unplayed cell is found
+        adjacentFoes.push(nextIndex);
+      } else {
+
+        break; // Exit if an unplayed or legal cell is found
       }
 
       nextRow += dRow;
@@ -343,9 +355,16 @@ function scanDirections(row, col) {
   });
 }
 
+function flipCellToFriend(adjacentFoes, friend) {
+  if (adjacentFoes.length > 0) {
+    adjacentFoes.forEach(index => {
+      document.getElementById(`box-image-${index}`).src = friend;
+    });
+  }
+}
+
 function scanLegalMoves() {
-  let [friend, foe, unplayed] = friendOrFoe();
-  const directions = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+  let [friend, foe, unplayed, legal] = friendOrFoe();
   clearLegalMoves();
   let legalMoves = [];
 
@@ -358,13 +377,10 @@ function scanLegalMoves() {
       if (src.includes(unplayed)) {   //Dont need to check anything other than unplayed
         let [row, col] = rowCol(i);
 
-        directions.forEach(direction => {
-          const [dRow, dCol] = direction;
-          let nextRow = row + dRow;
-          let nextCol = col + dCol;
+        processDirections(row, col, (nextRow, nextCol, dRow, dCol) => {
           let potentialFoes = [];
 
-          while ((nextRow >= 1) && (nextRow <= size) && (nextCol >= 1) && (nextCol <= size)) {
+          while (boundaries(nextRow, nextCol)) {
             let nextIndex = getIndex(nextRow, nextCol);
             let nextImgElement = document.getElementById(`box-image-${nextIndex}`);
 
@@ -374,11 +390,9 @@ function scanLegalMoves() {
 
             let nextSrc = nextImgElement.src.split('/').pop();
 
-// Somehow my logic is working ok, but the friend/foe is swapped and the legal moves are marked wrong
-            
-            if (nextSrc.includes(friend)) {   //This should say "friend"
+            if (nextSrc.includes(foe)) {
               potentialFoes.push(nextIndex);
-            } else if (nextSrc.includes(foe)) {   //This should say "foe"
+            } else if (nextSrc.includes(friend)) {
               if (potentialFoes.length > 0) {
                 imgElement.src = 'legal.jpeg';
               }
@@ -403,6 +417,12 @@ function clearLegalMoves() {
       imgElement.src = 'placeholder_image.jpg';
     }
   }
+}
+
+function legalMovesAvailable() {
+  const [whiteScore, blackScore, empty, legalScore] = calcScore();
+  console.log(`Legal moves available: ${legalScore > 0}`); // Debugging log
+  return (legalScore > 0);
 }
 
 
