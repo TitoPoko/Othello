@@ -48,56 +48,15 @@ function createGrid() {
   updateScores();
 }
 
-// the below ChangeImage function tries to incorporate noLegalMovesAvailale logic. It's not there yet.
-/*
-function changeImage(index) {
-  updateScores();
-  if (!legalMovesAvailable()) {
-    alert('No legal moves available, your turn is skipped');
-    skipped += 1;
-    clicked += 1;
-    changeBanner();
-    scanLegalMoves();
-    updateScores();
-     // Increment clicked for the skipped turn
-    scanLegalMoves();
-  } else {
-    const img = document.getElementById(`box-image-${index}`);
-    if (img.src.includes('legal.jpeg')) {
-      undoStack.push(captureLayout());          //An array of arrays!!!
-      
-      const [row, col] = rowCol(index);
-      let [friend, foe, unplayed, legal] = friendOrFoe();
-      
-      if (clicked % 2 == 0) {
-          img.src = 'black.jpeg';
-          img.alt = 'black piece';
-      } else {
-          img.src = 'white.jpeg';
-          img.alt = 'white piece';
-      }
-
-
-      clicked += 1;
-      lastPlayed(row, col)
-      scanDirections(row, col, friend, foe);
-      changeBanner();
-      scanLegalMoves();
-      updateScores();
-    }
-  }
-}
-*/
-
 function changeImage(index) {
   updateScores();
   const img = document.getElementById(`box-image-${index}`);
   if (img.src.includes('legal.jpeg')) {
-    undoStack.push(captureLayout());                    //An array of arrays!!!
+    undoStack.push(captureLayout());                    //An array of arrays ( for undoMove() )
     
     const [row, col] = rowCol(index);
     let [friend, foe, unplayed, legal] = friendOrFoe();
-    setImageSrc(img);                                   // refactored/added
+    setImageSrc(img);
     clicked += 1;
     lastPlayed(row, col)
     scanDirections(row, col, friend, foe);
@@ -106,8 +65,6 @@ function changeImage(index) {
     updateScores();
   }
 }
-
-// I think this function can be tied to whomever is friend. It works now but it can probably be better?
 
 function setImageSrc(img) {
   if (clicked % 2 == 0) {
@@ -143,7 +100,6 @@ function changeBanner() {
   } 
 }
 
-
 function endGame() {
   const [whiteScore, blackScore, empty, legalScore] = calcScore();
   return (clicked === ((size * size) - 4)) || ((whiteScore + blackScore) === (size * size));
@@ -160,7 +116,7 @@ function handleButtonClick() {
 
 function restartGame() {
   if (!setSize()) {
-      alert('Please choose a grid size');
+      alert('Please choose a grid size');  // Redundant/never will be used ( see setSize() )?
       return;
   }
 
@@ -278,24 +234,7 @@ function lastPlayed (row, col) {
   document.getElementById('clicked').innerText = clicked;
 }
 
-// Tester function to display contents of the .src for the last played,
-// given the row, col
-/*
-function srcDetails (row, col) {
-  let index = getIndex(row, col);
-  let imgElement = document.getElementById(`box-image-${index}`)
-
-  if (imgElement) {
-    let srcContent = imgElement.src.split('/').pop(); // Only takes the last part of the file path
-    return srcContent;
-  } else {
-    return null;
-  }
-}
-*/
-
 function getIndex(row, col) {
-  
   let index = ((row - 1) * size) + col;
   document.getElementById('index').innerText = index;
   return index;
@@ -314,34 +253,42 @@ function boundaries(nextRow, nextCol) {
   return ((nextRow >= 1) && (nextRow <= size) && (nextCol >= 1) && (nextCol <= size));
 }
 
-function processDirections(row, col, callback) {
+function processDirections(row, col) {
+  let positions = [];
   directions.forEach(direction => {
     const [dRow, dCol] = direction;
-    let nextRow = row + dRow;
-    let nextCol = col + dCol;
-    callback(nextRow, nextCol, dRow, dCol);
+    const [nextRow, nextCol] = nextRowCol(row, col, dRow, dCol);
+    positions.push([nextRow, nextCol, dRow, dCol]);
   });
+  return positions;
+}
+
+function nextRowCol(row, col, dRow, dCol) {
+  let nextRow = row + dRow;
+  let nextCol = col + dCol;
+  return[nextRow, nextCol];
 }
 
 function scanDirections(row, col, friend, foe) {
-  processDirections(row, col, (nextRow, nextCol, dRow, dCol) => {
+  let positions = processDirections(row, col);
   
+  positions.forEach(([nextRow, nextCol, dRow, dCol]) => {
     let adjacentFoes = [];
 
     while (boundaries(nextRow, nextCol)) {
       let nextIndex = getIndex(nextRow, nextCol);
-      let imgElement = document.getElementById(`box-image-${nextIndex}`);
+      let nextImgElement = document.getElementById(`box-image-${nextIndex}`);
     
-      if (!imgElement) {
+      if (!nextImgElement) {
         break;
       }
 
-      let src = imgElement.src.split('/').pop();
+      let src = nextImgElement.src.split('/').pop();
 
       if (src.includes(friend)) {
         flipCellToFriend(adjacentFoes, friend);
-
         break; // Exit the while loop once friend is found and foes are flipped
+
       } else if (src.includes(foe)) {
         adjacentFoes.push(nextIndex);
       } else {
@@ -349,8 +296,7 @@ function scanDirections(row, col, friend, foe) {
         break; // Exit if an unplayed or legal cell is found
       }
 
-      nextRow += dRow;
-      nextCol += dCol;
+      [nextRow, nextCol] = nextRowCol(nextRow, nextCol, dRow, dCol);
     }
   });
 }
@@ -376,8 +322,9 @@ function scanLegalMoves() {
 
       if (src.includes(unplayed)) {   //Dont need to check anything other than unplayed
         let [row, col] = rowCol(i);
+        let positions = processDirections(row, col);
 
-        processDirections(row, col, (nextRow, nextCol, dRow, dCol) => {
+        positions.forEach(([nextRow, nextCol, dRow, dCol]) => {
           let potentialFoes = [];
 
           while (boundaries(nextRow, nextCol)) {
@@ -401,8 +348,7 @@ function scanLegalMoves() {
               break;
             }
 
-            nextRow += dRow;
-            nextCol += dCol;
+            [nextRow, nextCol] = nextRowCol(nextRow, nextCol, dRow, dCol);
           }
         });
       }
@@ -419,12 +365,17 @@ function clearLegalMoves() {
   }
 }
 
+/*
+
+/// The logic/code that calls this function is not working... yet. The goal is to increment 'clicked' when a player
+// has no legal moves available. This will cause the current player to lose their turn.
+
 function legalMovesAvailable() {
   const [whiteScore, blackScore, empty, legalScore] = calcScore();
-  console.log(`Legal moves available: ${legalScore > 0}`); // Debugging log
+  console.log(`Legal moves available: ${legalScore > 0}`);            // Console log
   return (legalScore > 0);
 }
-
+*/
 
 /* Execution starts here */
 changeBanner();
