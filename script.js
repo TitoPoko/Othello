@@ -1,3 +1,10 @@
+
+document.addEventListener('DOMContentLoaded', (event) => {
+  console.log("DOM fully loaded and parsed");
+  changeBanner();
+  updateButton();
+});
+
 let clicked = 999;
 let gridCreated = false;
 let size = -1;
@@ -57,9 +64,9 @@ function changeImage(index) {
     const [row, col] = rowCol(index);
     let [friend, foe, unplayed, legal] = friendOrFoe();
     setImageSrc(img);
+    scanDirections(row, col);
     clicked += 1;
     lastPlayed(row, col)
-    scanDirections(row, col, friend, foe);
     changeBanner();
     scanLegalMoves();
     updateScores();
@@ -240,11 +247,34 @@ function getIndex(row, col) {
   return index;
 }
 
+function friend() {
+  return player[clicked % 2];
+}
+
+function foe() {
+  return player[(clicked % 2 + 1) % 2];
+}
+
+function isFriend(src) {
+  return src.includes(friend());
+}
+
+function isFoe(src) {
+  return src.includes(foe());
+}
+
+function isUnplayed(src) {
+  return src.includes('placeholder_image.jpg');
+}
+
+
 function friendOrFoe() {
   const unplayed = 'placeholder_image.jpg';
   const legal = 'legal.jpeg';
   let friend = player[clicked % 2];
   let foe = player[(clicked % 2 + 1) % 2];
+  document.getElementById('friend').innerText = friend;
+  document.getElementById('foe').innerText = foe;
 
   return [friend, foe, unplayed, legal];
 }
@@ -269,7 +299,12 @@ function nextRowCol(row, col, dRow, dCol) {
   return[nextRow, nextCol];
 }
 
-function scanDirections(row, col, friend, foe) {
+function getImgSrc(index) {
+  let imgElement = document.getElementById(`box-image-${index}`);
+  return imgElement.src.split('/').pop();
+}
+
+function scanDirections(row, col) {
   let positions = processDirections(row, col);
   
   positions.forEach(([nextRow, nextCol, dRow, dCol]) => {
@@ -277,23 +312,17 @@ function scanDirections(row, col, friend, foe) {
 
     while (boundaries(nextRow, nextCol)) {
       let nextIndex = getIndex(nextRow, nextCol);
-      let nextImgElement = document.getElementById(`box-image-${nextIndex}`);
-    
-      if (!nextImgElement) {
+      let src = getImgSrc(nextIndex);
+
+      if (isFriend(src)) {
+        flipCellToFriend(adjacentFoes);
+
         break;
-      }
-
-      let src = nextImgElement.src.split('/').pop();
-
-      if (src.includes(friend)) {
-        flipCellToFriend(adjacentFoes, friend);
-        break; // Exit the while loop once friend is found and foes are flipped
-
-      } else if (src.includes(foe)) {
+      } else if (isFoe(src)) {
         adjacentFoes.push(nextIndex);
       } else {
 
-        break; // Exit if an unplayed or legal cell is found
+        break;
       }
 
       [nextRow, nextCol] = nextRowCol(nextRow, nextCol, dRow, dCol);
@@ -301,50 +330,49 @@ function scanDirections(row, col, friend, foe) {
   });
 }
 
-function flipCellToFriend(adjacentFoes, friend) {
+function flipCellToFriend(adjacentFoes) {
+  const currentFriend = friend(); //Had to initiate this because "imgElement.src = friend()" wasnt working
   if (adjacentFoes.length > 0) {
     adjacentFoes.forEach(index => {
-      document.getElementById(`box-image-${index}`).src = friend;
+      const imgElement = document.getElementById(`box-image-${index}`);
+      imgElement.src = currentFriend;
     });
   }
 }
 
+
 function scanLegalMoves() {
-  let [friend, foe, unplayed, legal] = friendOrFoe();
   clearLegalMoves();
   let legalMoves = [];
 
   for (let i = 1; i <= size * size; i++) {
     let imgElement = document.getElementById(`box-image-${i}`);
 
-    if(imgElement) {  //if valid
-      let src = imgElement.src.split('/').pop();  //Get the filename of the pic
+    if(imgElement) {
+      let src = getImgSrc(i);
 
-      if (src.includes(unplayed)) {   //Dont need to check anything other than unplayed
-        let [row, col] = rowCol(i);
-        let positions = processDirections(row, col);
-
+      if (isUnplayed(src)) {
+        //let [row, col] = rowCol(i);
+        //let positions = processDirections(row, col);
+        let positions = processDirections(...rowCol(i)); //I got the spread operator in there!...
+        //"The spread operator allows an array to be expanded in places where multiple arguments are expected."
+        //Array "destructuring" passes the returned values as separate arguments.
         positions.forEach(([nextRow, nextCol, dRow, dCol]) => {
           let potentialFoes = [];
 
           while (boundaries(nextRow, nextCol)) {
-            let nextIndex = getIndex(nextRow, nextCol);
-            let nextImgElement = document.getElementById(`box-image-${nextIndex}`);
+            let nextSrc = getImgSrc(getIndex(nextRow, nextCol));
 
-            if (!nextImgElement) {
-              break;
-            }
-
-            let nextSrc = nextImgElement.src.split('/').pop();
-
-            if (nextSrc.includes(foe)) {
-              potentialFoes.push(nextIndex);
-            } else if (nextSrc.includes(friend)) {
+            if (isFoe(nextSrc)) {
+              potentialFoes.push(getIndex(nextRow, nextCol));
+            } else if (isFriend(nextSrc)) {
               if (potentialFoes.length > 0) {
                 imgElement.src = 'legal.jpeg';
               }
+
               break;
             } else {
+
               break;
             }
 
