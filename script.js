@@ -10,20 +10,28 @@ let gridCreated = false;
 let size = -1;
 let undoStack = [];
 const directions = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
-const player = ['black.jpeg', 'white.jpeg'];
+const players = ['black.jpeg', 'white.jpeg'];
 
+function gridSize() {
+  return parseInt(document.getElementById('gridSize').value)
+} 
 function setSize() {
-  size = parseInt(document.getElementById('gridSize').value);
 
-  if (isNaN(size)) {
+  if (isNaN(gridSize())) {
     alert('Please choose a grid size');
     return false;
   }
   return true;
 }
 
+function postMoveWrapUp() {
+  lastPlayed(0, 0);
+  scanLegalMoves();
+  updateScores();
+}
+
 function createGrid() {
-  size = parseInt(document.getElementById('gridSize').value);
+  size = gridSize();
   if (!setSize()) return;
 
   const container = document.querySelector('.image-container');
@@ -35,8 +43,7 @@ function createGrid() {
   for (let i = 1; i <= size * size; i++) {
       const div = document.createElement('div');
       div.className = 'image-box';
-      div.style.width = `${cellSize}px`;
-      div.style.height = `${cellSize}px`;
+      div.style.width = div.style.height = `${cellSize}px`;
       div.onclick = () => changeImage(i);
       const img = document.createElement('img');
       img.id = `box-image-${i}`;
@@ -50,38 +57,35 @@ function createGrid() {
   gridCreated = true;
   updateButton();
   setBoard();
-  lastPlayed(0, 0);
-  scanLegalMoves();
-  updateScores();
+  postMoveWrapUp();
 }
 
 function changeImage(index) {
   updateScores();
   const img = document.getElementById(`box-image-${index}`);
   if (img.src.includes('legal.jpeg')) {
-    undoStack.push(captureLayout());                    //An array of arrays ( for undoMove() )
+    undoStack.push(captureLayout());
     
     const [row, col] = rowCol(index);
-    let [friend, foe, unplayed, legal] = friendOrFoe();
     setImageSrc(img);
     scanDirections(row, col);
     clicked += 1;
-    lastPlayed(row, col)
-    changeBanner();
-    scanLegalMoves();
-    updateScores();
+    postMoveWrapUp();
   }
 }
 
+function blacksTurn() {
+  return(clicked % 2 == 0);
+}
+
 function setImageSrc(img) {
-  if (clicked % 2 == 0) {
+  if (blacksTurn()) {
     img.src = 'black.jpeg';
     img.alt = 'black piece';
   } else {
     img.src = 'white.jpeg';
     img.alt = 'white piece';
   }
-  return [img.src, img.alt];
 }
 
 function changeBanner() {
@@ -108,6 +112,7 @@ function changeBanner() {
 }
 
 function endGame() {
+  size = gridSize();
   const [whiteScore, blackScore, empty, legalScore] = calcScore();
   return (clicked === ((size * size) - 4)) || ((whiteScore + blackScore) === (size * size));
 }
@@ -122,10 +127,6 @@ function handleButtonClick() {
 }
 
 function restartGame() {
-  if (!setSize()) {
-      alert('Please choose a grid size');  // Redundant/never will be used ( see setSize() )?
-      return;
-  }
 
   gridCreated = false;
   clicked = 0;
@@ -141,26 +142,39 @@ function restartGame() {
 function getDimensions() {
   const halfCube = (size * size) / 2;
   const firstWhite = halfCube - (size/2);
-  const firstBlack = halfCube - (size/2) + 1;
+  const firstBlack = firstWhite + 1;
   const secondBlack = halfCube + (size/2);
-  const secondWhite = halfCube + (size/2) + 1;
+  const secondWhite = secondBlack + 1;
   return [firstWhite, firstBlack, secondBlack, secondWhite];
+}
+
+function setWhiteSrc(index) {
+  document.getElementById(`box-image-${index}`).src = 'white.jpeg';
+}
+
+function setWhiteAlt(index) {
+  document.getElementById(`box-image-${index}`).alt = 'white.jpeg';
+}
+
+function setBlackSrc(index) {
+  document.getElementById(`box-image-${index}`).src = 'black.jpeg';
+}
+
+function setBlackAlt(index) {
+  document.getElementById(`box-image-${index}`).alt = 'black.jpeg';
 }
 
 function setBoard() {
   const [firstWhite, firstBlack, secondBlack, secondWhite] = getDimensions();
 
-  document.getElementById(`box-image-${firstWhite}`).src = 'white.jpeg';
-  document.getElementById(`box-image-${firstWhite}`).alt = 'white piece';
-  
-  document.getElementById(`box-image-${firstBlack}`).src = 'black.jpeg';
-  document.getElementById(`box-image-${firstBlack}`).alt = 'black piece';
-  
-  document.getElementById(`box-image-${secondBlack}`).src = 'black.jpeg';
-  document.getElementById(`box-image-${secondBlack}`).alt = 'black piece';
-  
-  document.getElementById(`box-image-${secondWhite}`).src = 'white.jpeg';
-  document.getElementById(`box-image-${secondWhite}`).alt = 'white piece';
+  setWhiteSrc(firstWhite);
+  setWhiteAlt(firstWhite);
+  setWhiteSrc(secondWhite);
+  setWhiteAlt(secondWhite);
+  setBlackSrc(firstBlack);
+  setBlackAlt(firstBlack);
+  setBlackSrc(secondBlack);
+  setBlackAlt(secondBlack);
 
   updateScores();
 }
@@ -248,11 +262,11 @@ function getIndex(row, col) {
 }
 
 function friend() {
-  return player[clicked % 2];
+  return players[clicked % 2];
 }
 
 function foe() {
-  return player[(clicked % 2 + 1) % 2];
+  return players[(clicked % 2 + 1) % 2];
 }
 
 function isFriend(src) {
@@ -265,18 +279,6 @@ function isFoe(src) {
 
 function isUnplayed(src) {
   return src.includes('placeholder_image.jpg');
-}
-
-
-function friendOrFoe() {
-  const unplayed = 'placeholder_image.jpg';
-  const legal = 'legal.jpeg';
-  let friend = player[clicked % 2];
-  let foe = player[(clicked % 2 + 1) % 2];
-  document.getElementById('friend').innerText = friend;
-  document.getElementById('foe').innerText = foe;
-
-  return [friend, foe, unplayed, legal];
 }
 
 function boundaries(nextRow, nextCol) {
@@ -299,20 +301,22 @@ function nextRowCol(row, col, dRow, dCol) {
   return[nextRow, nextCol];
 }
 
-function getImgSrc(index) {
+function imgSrc(index) {
   let imgElement = document.getElementById(`box-image-${index}`);
   return imgElement.src.split('/').pop();
 }
 
 function scanDirections(row, col) {
-  let positions = processDirections(row, col);
+  //let positions = processDirections(row, col);
   
-  positions.forEach(([nextRow, nextCol, dRow, dCol]) => {
+  processDirections(row, col).forEach(([nextRow, nextCol, dRow, dCol]) => {
     let adjacentFoes = [];
+
+    [nextRow, nextCol] = nextRowCol(nextRow, nextCol, dRow, dCol);
 
     while (boundaries(nextRow, nextCol)) {
       let nextIndex = getIndex(nextRow, nextCol);
-      let src = getImgSrc(nextIndex);
+      let src = imgSrc(nextIndex);
 
       if (isFriend(src)) {
         flipCellToFriend(adjacentFoes);
@@ -349,19 +353,19 @@ function scanLegalMoves() {
     let imgElement = document.getElementById(`box-image-${i}`);
 
     if(imgElement) {
-      let src = getImgSrc(i);
+      let src = imgSrc(i);
 
       if (isUnplayed(src)) {
         //let [row, col] = rowCol(i);
         //let positions = processDirections(row, col);
-        let positions = processDirections(...rowCol(i)); //I got the spread operator in there!...
+        //let positions = processDirections(...rowCol(i)); //I got the spread operator in there!...
         //"The spread operator allows an array to be expanded in places where multiple arguments are expected."
         //Array "destructuring" passes the returned values as separate arguments.
-        positions.forEach(([nextRow, nextCol, dRow, dCol]) => {
+        processDirections(...rowCol(i)).forEach(([nextRow, nextCol, dRow, dCol]) => {
           let potentialFoes = [];
 
           while (boundaries(nextRow, nextCol)) {
-            let nextSrc = getImgSrc(getIndex(nextRow, nextCol));
+            let nextSrc = imgSrc(getIndex(nextRow, nextCol));
 
             if (isFoe(nextSrc)) {
               potentialFoes.push(getIndex(nextRow, nextCol));
