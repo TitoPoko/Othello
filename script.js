@@ -28,6 +28,7 @@ function postMoveWrapUp() {
   lastPlayed(0, 0);
   scanLegalMoves();
   updateScores();
+  changeBanner();
 }
 
 function createGrid() {
@@ -53,7 +54,6 @@ function createGrid() {
       container.appendChild(div);
   }
   clicked = 0;
-  changeBanner();
   gridCreated = true;
   updateButton();
   setBoard();
@@ -130,7 +130,7 @@ function restartGame() {
 
   gridCreated = false;
   clicked = 0;
-  undoStack = [];   //Clears out the array so an "undo move" click doesnt ruin the layout when pressed
+  undoStack = [];
   const container = document.querySelector('.image-container');
   container.innerHTML = '';
   createGrid();
@@ -148,33 +148,23 @@ function getDimensions() {
   return [firstWhite, firstBlack, secondBlack, secondWhite];
 }
 
-function setWhiteSrc(index) {
+function setWhite(index) {
   document.getElementById(`box-image-${index}`).src = 'white.jpeg';
-}
-
-function setWhiteAlt(index) {
   document.getElementById(`box-image-${index}`).alt = 'white.jpeg';
 }
 
-function setBlackSrc(index) {
+function setBlack(index) {
   document.getElementById(`box-image-${index}`).src = 'black.jpeg';
-}
-
-function setBlackAlt(index) {
   document.getElementById(`box-image-${index}`).alt = 'black.jpeg';
 }
 
 function setBoard() {
   const [firstWhite, firstBlack, secondBlack, secondWhite] = getDimensions();
 
-  setWhiteSrc(firstWhite);
-  setWhiteAlt(firstWhite);
-  setWhiteSrc(secondWhite);
-  setWhiteAlt(secondWhite);
-  setBlackSrc(firstBlack);
-  setBlackAlt(firstBlack);
-  setBlackSrc(secondBlack);
-  setBlackAlt(secondBlack);
+  setWhite(firstWhite);
+  setWhite(secondWhite);
+  setBlack(firstBlack);
+  setBlack(secondBlack);
 
   updateScores();
 }
@@ -186,14 +176,16 @@ function calcScore () {
   let empty = 0;
   for (let i = 1; i <= size * size; i++) {
     const img = document.getElementById(`box-image-${i}`);
-    if (img.src.includes('white.jpeg')) {
-      whiteScore += 1;
-    } else if (img.src.includes('black.jpeg')) {
-      blackScore += 1;
-    } else if (img.src.includes('placeholder_image.jpg')) {
-      empty += 1;
-    } else if (img.src.includes('legal.jpeg')) {
-      legalScore += 1;
+    if (img) {
+      if (img.src.includes('white.jpeg')) {
+        whiteScore += 1;
+      } else if (img.src.includes('black.jpeg')) {
+        blackScore += 1;
+      } else if (img.src.includes('placeholder_image.jpg')) {
+        empty += 1;
+      } else if (img.src.includes('legal.jpeg')) {
+        legalScore += 1;
+      }
     }
   }
   return [whiteScore, blackScore, empty, legalScore];
@@ -285,16 +277,6 @@ function boundaries(nextRow, nextCol) {
   return ((nextRow >= 1) && (nextRow <= size) && (nextCol >= 1) && (nextCol <= size));
 }
 
-function processDirections(row, col) {
-  let positions = [];
-  directions.forEach(direction => {
-    const [dRow, dCol] = direction;
-    const [nextRow, nextCol] = nextRowCol(row, col, dRow, dCol);
-    positions.push([nextRow, nextCol, dRow, dCol]);
-  });
-  return positions;
-}
-
 function nextRowCol(row, col, dRow, dCol) {
   let nextRow = row + dRow;
   let nextCol = col + dCol;
@@ -307,12 +289,12 @@ function imgSrc(index) {
 }
 
 function scanDirections(row, col) {
-  //let positions = processDirections(row, col);
+
+  directions.forEach(([dRow, dCol]) => { 
   
-  processDirections(row, col).forEach(([nextRow, nextCol, dRow, dCol]) => {
     let adjacentFoes = [];
 
-    [nextRow, nextCol] = nextRowCol(nextRow, nextCol, dRow, dCol);
+    [nextRow, nextCol] = nextRowCol(row, col, dRow, dCol);
 
     while (boundaries(nextRow, nextCol)) {
       let nextIndex = getIndex(nextRow, nextCol);
@@ -335,7 +317,7 @@ function scanDirections(row, col) {
 }
 
 function flipCellToFriend(adjacentFoes) {
-  const currentFriend = friend(); //Had to initiate this because "imgElement.src = friend()" wasnt working
+  const currentFriend = friend();
   if (adjacentFoes.length > 0) {
     adjacentFoes.forEach(index => {
       const imgElement = document.getElementById(`box-image-${index}`);
@@ -343,7 +325,6 @@ function flipCellToFriend(adjacentFoes) {
     });
   }
 }
-
 
 function scanLegalMoves() {
   clearLegalMoves();
@@ -356,12 +337,12 @@ function scanLegalMoves() {
       let src = imgSrc(i);
 
       if (isUnplayed(src)) {
-        //let [row, col] = rowCol(i);
-        //let positions = processDirections(row, col);
-        //let positions = processDirections(...rowCol(i)); //I got the spread operator in there!...
-        //"The spread operator allows an array to be expanded in places where multiple arguments are expected."
-        //Array "destructuring" passes the returned values as separate arguments.
-        processDirections(...rowCol(i)).forEach(([nextRow, nextCol, dRow, dCol]) => {
+        let [row, col] = rowCol(i);
+
+        directions.forEach(([dRow, dCol])=> {
+
+          let [nextRow, nextCol] = nextRowCol(row, col, dRow, dCol);
+
           let potentialFoes = [];
 
           while (boundaries(nextRow, nextCol)) {
@@ -397,18 +378,3 @@ function clearLegalMoves() {
   }
 }
 
-/*
-
-/// The logic/code that calls this function is not working... yet. The goal is to increment 'clicked' when a player
-// has no legal moves available. This will cause the current player to lose their turn.
-
-function legalMovesAvailable() {
-  const [whiteScore, blackScore, empty, legalScore] = calcScore();
-  console.log(`Legal moves available: ${legalScore > 0}`);            // Console log
-  return (legalScore > 0);
-}
-*/
-
-/* Execution starts here */
-changeBanner();
-updateButton();
